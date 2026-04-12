@@ -312,7 +312,7 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
                                     }}
                                     onDelete={(e) => {
                                         e.stopPropagation()
-                                        deletePreset(preset.id)
+                                        if (confirm('프리셋을 삭제하시겠습니까?')) deletePreset(preset.id)
                                     }}
                                     onRename={() => handleRename(preset.id)}
                                     onCancelEdit={() => setEditingId(null)}

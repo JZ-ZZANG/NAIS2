@@ -13,12 +13,21 @@ import WebView from '@/pages/WebView'
 import Library from '@/pages/Library'
 import Settings from '@/pages/Settings'
 import ToolsMode from '@/pages/ToolsMode'
+import Marketplace from '@/pages/Marketplace'
+import MarketplaceDetail from '@/pages/MarketplaceDetail'
+import { useMarketAuthStore } from '@/stores/market-auth-store'
 
 function AppContent() {
     // Scene generation hook at App level - persists across page navigation
     useSceneGeneration()
     useUpdateChecker()
     useShortcuts()
+
+    // Initialize marketplace auth on app mount
+    const initMarketAuth = useMarketAuthStore(s => s.init)
+    useEffect(() => {
+        initMarketAuth()
+    }, [initMarketAuth])
 
     // Disable right-click globally except for allowed elements
     useEffect(() => {
@@ -45,6 +54,8 @@ function AppContent() {
                 <Route path="/scenes" element={<SceneMode />} />
                 <Route path="/scenes/:id" element={<SceneDetail />} />
                 <Route path="/tools" element={<ToolsMode />} />
+                <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
                 <Route path="/web" element={<WebView />} />
                 <Route path="/library" element={<Library />} />
                 <Route path="/settings" element={<Settings />} />

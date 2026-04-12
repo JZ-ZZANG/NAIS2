@@ -22,6 +22,7 @@ import {
     Zap,
     PanelLeft,
     PanelRight,
+    Store,
 } from 'lucide-react'
 
 interface ThreeColumnLayoutProps {
@@ -88,6 +89,7 @@ export function ThreeColumnLayout({ children }: ThreeColumnLayoutProps) {
         { path: '/', icon: Home, labelKey: 'nav.main' },
         { path: '/scenes', icon: Film, labelKey: 'nav.scenes' },
         { path: '/tools', icon: Wand2, labelKey: 'smartTools.title' },
+        { path: '/marketplace', icon: Store, labelKey: 'nav.marketplace' },
         { path: '/web', icon: Globe, labelKey: 'nav.web' },
         { path: '/library', icon: Images, labelKey: 'nav.library' },
         { path: '/settings', icon: Settings, labelKey: 'nav.settings' },

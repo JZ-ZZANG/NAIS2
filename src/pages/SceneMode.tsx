@@ -73,6 +73,7 @@ import {
     ImageOff,
     GripVertical,
     ArrowUpDown,
+    Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tip } from '@/components/ui/tooltip'
@@ -83,6 +84,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
 import { ExportDialog } from '@/components/scene/ExportDialog'
+import { UploadPresetDialog } from '@/components/marketplace/UploadPresetDialog'
 import {
     Dialog,
     DialogContent,
@@ -403,6 +405,7 @@ export default function SceneMode() {
 
     const [showExportDialog, setShowExportDialog] = useState(false)
     const [exportScenesFilter, setExportScenesFilter] = useState<'all' | 'selected'>('all')
+    const [showUploadDialog, setShowUploadDialog] = useState(false)
 
     // Scenes to export based on filter
     const scenesToExport = exportScenesFilter === 'selected'
@@ -649,6 +652,11 @@ export default function SceneMode() {
                                 <Copy className="h-4 w-4" />
                             </Button>
                         </Tip>
+                        <Tip content={t('scene.shareToMarket', '마켓에 공유')}>
+                            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={() => setShowUploadDialog(true)} disabled={!activePreset || scenes.length === 0 || isGenerating}>
+                                <Store className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         <Tip content={t('scene.exportZip', '모든 씬 이미지 ZIP 내보내기')}>
                             <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleExportZip} disabled={scenes.length === 0}>
                                 <Download className="h-4 w-4" />
@@ -749,7 +757,7 @@ export default function SceneMode() {
                                 </Tip>
                             )}
                             <Tip content={t('scene.deletePreset', '프리셋 삭제')}>
-                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => deletePreset(activePreset.id)} disabled={isGenerating}>
+                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (confirm(t('scene.confirmDeletePreset', '이 프리셋을 삭제하시겠습니까?'))) deletePreset(activePreset.id) }} disabled={isGenerating}>
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </Tip>
@@ -843,6 +851,12 @@ export default function SceneMode() {
                     />
                 )
             }
+
+            <UploadPresetDialog
+                open={showUploadDialog}
+                onOpenChange={setShowUploadDialog}
+                preset={activePreset ?? null}
+            />
         </div >
     )
 }

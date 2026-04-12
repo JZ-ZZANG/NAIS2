@@ -63,9 +63,11 @@ import {
     Download,
     MoreHorizontal,
     GripVertical,
+    Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/use-toast'
+import { UploadFragmentDialog } from '@/components/marketplace/UploadFragmentDialog'
 
 interface FragmentPromptDialogProps {
     open: boolean
@@ -99,6 +101,7 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
     const [tooltipEnabled, setTooltipEnabled] = useState(false)
+    const [showUploadDialog, setShowUploadDialog] = useState(false)
 
     // Dialog 열릴 때 Tooltip 비활성화 후 500ms 뒤 활성화
     useEffect(() => {
@@ -484,6 +487,11 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                                         <Download className="h-4 w-4 mr-2" />
                                         {t('fragment.exportAll', '전체 내보내기 (JSON)')}
                                     </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setShowUploadDialog(true)} disabled={files.length === 0}>
+                                        <Store className="h-4 w-4 mr-2" />
+                                        {t('marketplace.shareFragments', '마켓에 공유')}
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -648,6 +656,11 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                     </div>
                 </div>
             </DialogContent>
+
+            <UploadFragmentDialog
+                open={showUploadDialog}
+                onOpenChange={setShowUploadDialog}
+            />
         </Dialog>
     )
 }
