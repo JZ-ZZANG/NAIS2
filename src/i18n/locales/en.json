@@ -22,6 +22,7 @@
     "common": {
         "save": "Save",
         "saved": "Saved successfully",
+        "saving": "Saving...",
         "cancel": "Cancel",
         "delete": "Delete",
         "edit": "Edit",
@@ -432,7 +433,8 @@
             "appearance": "Appearance",
             "api": "API",
             "storage": "Storage",
-            "shortcuts": "Shortcuts"
+            "shortcuts": "Shortcuts",
+            "discord": "Discord Community"
         },
         "api": {
             "title": "API Settings",
@@ -620,9 +622,19 @@
         "signInDiscord": "Sign in with Discord",
         "signingIn": "Signing in...",
         "signingInDiscord": "Discord Sign-in",
+        "waitingBrowser": "Complete the Discord sign-in in your browser.",
         "signedIn": "Signed in",
         "signedOut": "Signed out",
         "signOut": "Sign out",
+        "changeUsername": "Change Username",
+        "changeUsernameDesc": "Enter between 2 and 20 characters. You can only change once per 24 hours.",
+        "username": "Username",
+        "usernamePlaceholder": "Enter username",
+        "usernameUpdated": "Username updated",
+        "usernameUpdateFailed": "Failed to update username",
+        "usernameTaken": "This username is already taken",
+        "usernameCooldown": "You can only change your username once per 24 hours",
+        "usernameCooldownRemaining": "You can change it again in {{time}}.",
         "signInFailed": "Sign-in failed",
         "loginRequired": "Sign-in required",
         "shareToMarket": "Share to Marketplace",

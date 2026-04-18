@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { usePresetStore } from '@/stores/preset-store'
 import { cn } from '@/lib/utils'
 import {
@@ -212,6 +213,7 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
     const [newName, setNewName] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -312,7 +314,7 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
                                     }}
                                     onDelete={(e) => {
                                         e.stopPropagation()
-                                        if (confirm('프리셋을 삭제하시겠습니까?')) deletePreset(preset.id)
+                                        setDeleteTargetId(preset.id)
                                     }}
                                     onRename={() => handleRename(preset.id)}
                                     onCancelEdit={() => setEditingId(null)}
@@ -368,6 +370,16 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
                     )}
                 </div>
             </DialogContent>
+            <ConfirmDialog
+                open={!!deleteTargetId}
+                onOpenChange={(o) => !o && setDeleteTargetId(null)}
+                title={t('preset.deleteTitle', '프리셋 삭제')}
+                description={t('preset.confirmDelete', '프리셋을 삭제하시겠습니까?')}
+                confirmText={t('common.delete', '삭제')}
+                cancelText={t('common.cancel', '취소')}
+                variant="destructive"
+                onConfirm={() => { if (deleteTargetId) deletePreset(deleteTargetId) }}
+            />
         </Dialog>
     )
 }

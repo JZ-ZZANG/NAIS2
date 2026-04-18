@@ -1,31 +1,26 @@
 import { create } from 'zustand'
 import { supabase, Profile } from '@/lib/supabase'
-import { invoke } from '@tauri-apps/api/core'
-import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { onOpenUrl } from '@tauri-apps/plugin-deep-link'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
-// We use Supabase's default callback URL as the base,
-// and configure Site URL in Supabase dashboard to this unique pattern.
-// The embedded browser detects navigation to this URL and extracts tokens.
-const OAUTH_CALLBACK_PATTERN = 'nais2-oauth.local/callback'
-const OAUTH_REDIRECT_URL = `https://${OAUTH_CALLBACK_PATTERN}`
+const OAUTH_REDIRECT_URL = 'nais2://oauth-callback'
 
 interface MarketAuthState {
     user: { id: string; email?: string } | null
     profile: Profile | null
     loading: boolean
     signingIn: boolean
-    pendingOAuthUrl: string | null
 
     init: () => Promise<void>
-    startDiscordSignIn: () => Promise<string>
-    openOAuthBrowser: (url: string, rect: { x: number; y: number; width: number; height: number }) => Promise<void>
-    resizeOAuthBrowser: (rect: { x: number; y: number; width: number; height: number }) => Promise<void>
-    cancelSignIn: () => Promise<void>
+    signInWithDiscord: () => Promise<void>
+    cancelSignIn: () => void
     signOut: () => Promise<void>
+    updateUsername: (username: string) => Promise<void>
 }
 
 let cancelResolver: (() => void) | null = null
-let callbackUnlisten: UnlistenFn | null = null
+let deepLinkUnlisten: (() => void) | null = null
 
 async function loadProfile(userId: string): Promise<Profile | null> {
     try {
@@ -41,30 +36,59 @@ async function loadProfile(userId: string): Promise<Profile | null> {
     }
 }
 
+async function processCallbackUrl(callbackUrl: string) {
+    const urlObj = new URL(callbackUrl)
+
+    const queryParams = urlObj.searchParams
+    const errorCode = queryParams.get('error')
+    if (errorCode) {
+        const errorDesc = queryParams.get('error_description') || errorCode
+        throw new Error(`OAuth 실패: ${decodeURIComponent(errorDesc)}`)
+    }
+
+    const hash = urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash
+    const hashParams = new URLSearchParams(hash)
+
+    const hashError = hashParams.get('error')
+    if (hashError) {
+        const errorDesc = hashParams.get('error_description') || hashError
+        throw new Error(`OAuth 실패: ${decodeURIComponent(errorDesc)}`)
+    }
+
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
+
+    if (!accessToken || !refreshToken) {
+        throw new Error('인증 토큰이 없습니다. 다시 시도해주세요.')
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+    })
+    if (sessionError) throw sessionError
+}
+
 export const useMarketAuthStore = create<MarketAuthState>((set) => ({
     user: null,
     profile: null,
     loading: true,
     signingIn: false,
-    pendingOAuthUrl: null,
 
     init: async () => {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
             set({ user: { id: session.user.id, email: session.user.email }, loading: false })
-            // Fetch profile async (fire and forget - non-blocking)
             loadProfile(session.user.id).then(profile => set({ profile }))
         } else {
             set({ user: null, profile: null, loading: false })
         }
 
-        // CRITICAL: onAuthStateChange callback must NOT be async because
-        // Supabase's setSession/notifyAllSubscribers waits for all callbacks
-        // to finish, causing deadlocks if we do async DB queries here.
+        // CRITICAL: onAuthStateChange callback must NOT be async — Supabase
+        // awaits all subscribers, causing deadlocks with async DB queries.
         supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 set({ user: { id: session.user.id, email: session.user.email } })
-                // Fetch profile separately
                 loadProfile(session.user.id).then(profile => set({ profile }))
             } else {
                 set({ user: null, profile: null })
@@ -72,9 +96,7 @@ export const useMarketAuthStore = create<MarketAuthState>((set) => ({
         })
     },
 
-    // Step 1: Get OAuth URL from Supabase and set signingIn state.
-    // Returns the URL so UI can position the browser after mounting the modal.
-    startDiscordSignIn: async () => {
+    signInWithDiscord: async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'discord',
             options: {
@@ -87,14 +109,8 @@ export const useMarketAuthStore = create<MarketAuthState>((set) => ({
             throw new Error(error?.message || 'Failed to get OAuth URL')
         }
 
-        set({ signingIn: true, pendingOAuthUrl: data.url })
-        return data.url
-    },
+        set({ signingIn: true })
 
-    // Step 2: UI calculates target rect from modal container and calls this.
-    // Opens the webview at the given coordinates and listens for callback.
-    openOAuthBrowser: async (url, rect) => {
-        // Create promise + resolvers
         let resolveCallback: (value: string) => void = () => { }
         let rejectCallback: (reason: any) => void = () => { }
         const callbackPromise = new Promise<string>((resolve, reject) => {
@@ -102,102 +118,85 @@ export const useMarketAuthStore = create<MarketAuthState>((set) => ({
             rejectCallback = reject
         })
 
-        // CRITICAL: Await listener registration BEFORE opening the browser.
-        // Otherwise the callback event may fire before we're listening and be lost.
-        callbackUnlisten = await listen<string>('oauth-callback', (event) => {
-            resolveCallback(event.payload)
+        // Register deep-link listener BEFORE opening the browser so we don't
+        // miss the callback if the user is very fast.
+        deepLinkUnlisten = await onOpenUrl((urls) => {
+            const callback = urls.find(u => u.startsWith('nais2://oauth-callback'))
+            if (callback) resolveCallback(callback)
         })
 
-        // Set up timeout and cancel handler
         const timeout = setTimeout(() => {
-            if (callbackUnlisten) callbackUnlisten()
-            cancelResolver = null
             rejectCallback(new Error('OAuth timeout'))
         }, 5 * 60 * 1000)
 
-        cancelResolver = () => {
-            clearTimeout(timeout)
-            if (callbackUnlisten) callbackUnlisten()
-            cancelResolver = null
-            rejectCallback(new Error('OAuth cancelled'))
-        }
-
-        // Now open the browser - listener is guaranteed active
-        await invoke('open_oauth_browser', {
-            url,
-            callbackPattern: OAUTH_CALLBACK_PATTERN,
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-        })
+        cancelResolver = () => rejectCallback(new Error('OAuth cancelled'))
 
         try {
+            await openUrl(data.url)
             const callbackUrl = await callbackPromise
-            clearTimeout(timeout)
 
-            const urlObj = new URL(callbackUrl)
+            // Bring app window back to focus after browser callback.
+            try {
+                const win = getCurrentWindow()
+                await win.unminimize()
+                await win.setFocus()
+            } catch { }
 
-            // Check for error in query params first (OAuth failure case)
-            const queryParams = urlObj.searchParams
-            const errorCode = queryParams.get('error')
-            if (errorCode) {
-                const errorDesc = queryParams.get('error_description') || errorCode
-                throw new Error(`OAuth 실패: ${decodeURIComponent(errorDesc)}`)
-            }
-
-            // Parse hash fragment for tokens
-            const hash = urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash
-            const hashParams = new URLSearchParams(hash)
-
-            // Check for error in hash too
-            const hashError = hashParams.get('error')
-            if (hashError) {
-                const errorDesc = hashParams.get('error_description') || hashError
-                throw new Error(`OAuth 실패: ${decodeURIComponent(errorDesc)}`)
-            }
-
-            const accessToken = hashParams.get('access_token')
-            const refreshToken = hashParams.get('refresh_token')
-
-            if (!accessToken || !refreshToken) {
-                throw new Error('인증 토큰이 없습니다. 다시 시도해주세요.')
-            }
-
-            const { error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-            })
-            if (sessionError) throw sessionError
+            await processCallbackUrl(callbackUrl)
         } finally {
             clearTimeout(timeout)
-            if (callbackUnlisten) {
-                callbackUnlisten()
-                callbackUnlisten = null
+            if (deepLinkUnlisten) {
+                deepLinkUnlisten()
+                deepLinkUnlisten = null
             }
             cancelResolver = null
-            await invoke('close_oauth_browser').catch(() => { })
-            set({ signingIn: false, pendingOAuthUrl: null })
+            set({ signingIn: false })
         }
     },
 
-    resizeOAuthBrowser: async (rect) => {
-        await invoke('resize_oauth_browser', {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-        }).catch(() => { })
-    },
-
-    cancelSignIn: async () => {
+    cancelSignIn: () => {
         if (cancelResolver) cancelResolver()
-        await invoke('close_oauth_browser').catch(() => { })
-        set({ signingIn: false, pendingOAuthUrl: null })
     },
 
     signOut: async () => {
         await supabase.auth.signOut()
         set({ user: null, profile: null })
     },
+
+    updateUsername: async (username: string) => {
+        const trimmed = username.trim()
+        if (trimmed.length < 2 || trimmed.length > 20) {
+            throw new Error('닉네임은 2자 이상 20자 이하여야 합니다')
+        }
+        const { user, profile } = useMarketAuthStore.getState()
+        if (!user || !profile) throw new Error('로그인이 필요합니다')
+        if (trimmed === profile.username) return
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .update({ username: trimmed })
+            .eq('id', user.id)
+            .select()
+            .single()
+
+        if (error) {
+            if (error.code === 'P0001' && error.message?.includes('username_cooldown')) {
+                const e: any = new Error('username_cooldown')
+                e.code = 'username_cooldown'
+                throw e
+            }
+            throw error
+        }
+        set({ profile: data as Profile })
+    },
 }))
+
+export const USERNAME_COOLDOWN_HOURS = 24
+
+export function getUsernameCooldownEndsAt(profile: Profile | null): Date | null {
+    if (!profile?.username_changed_at) return null
+    const lastChanged = new Date(profile.username_changed_at)
+    const endsAt = new Date(lastChanged.getTime() + USERNAME_COOLDOWN_HOURS * 60 * 60 * 1000)
+    if (endsAt.getTime() <= Date.now()) return null
+    return endsAt
+}

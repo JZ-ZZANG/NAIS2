@@ -22,6 +22,7 @@ export interface Profile {
     username: string
     avatar_url: string | null
     created_at: string
+    username_changed_at: string | null
 }
 
 export type MarketPresetType = 'scene' | 'fragment'

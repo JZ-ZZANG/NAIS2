@@ -1,6 +1,6 @@
 {
   "name": "nais2",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "license": "GPL-3.0",
   "private": true,
   "type": "module",
@@ -37,6 +37,7 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "@supabase/supabase-js": "^2.103.0",
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-deep-link": "^2.4.8",
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-http": "^2.0.0",

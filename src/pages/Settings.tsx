@@ -38,7 +38,10 @@ import {
     Database,
     AlertTriangle,
     HardDrive,
+    MessagesSquare,
+    ExternalLink,
 } from 'lucide-react'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useThemeStore } from '@/stores/theme-store'
@@ -325,6 +328,17 @@ export default function Settings() {
                         {t(section.labelKey)}
                     </button>
                 ))}
+
+                <div className="pt-2 mt-2 border-t border-border/50">
+                    <button
+                        onClick={() => openUrl('https://discord.gg/N78K9GPN')}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-[#5865F2]/10 hover:text-[#5865F2]"
+                    >
+                        <MessagesSquare className="h-4 w-4" />
+                        <span className="flex-1 text-left">{t('settingsPage.sections.discord', '디스코드 커뮤니티')}</span>
+                        <ExternalLink className="h-3 w-3 opacity-60" />
+                    </button>
+                </div>
             </aside>
 
             {/* Content */}

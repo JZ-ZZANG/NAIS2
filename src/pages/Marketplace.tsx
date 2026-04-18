@@ -1,13 +1,15 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Store, Heart, Download, LogIn, LogOut, Search, Clock, Flame, User, X, Trash2, Package, Film, Puzzle } from 'lucide-react'
+import { Store, Heart, Download, LogIn, LogOut, Search, Clock, Flame, User, X, Trash2, Package, Film, Puzzle, Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/use-toast'
 import { supabase, MarketPreset, readableError } from '@/lib/supabase'
 import { useMarketAuthStore } from '@/stores/market-auth-store'
 import { cn } from '@/lib/utils'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { ChangeUsernameDialog } from '@/components/marketplace/ChangeUsernameDialog'
 
 import { MarketPresetType } from '@/lib/supabase'
 
@@ -24,13 +26,9 @@ export default function Marketplace() {
     const profile = useMarketAuthStore(s => s.profile)
     const authLoading = useMarketAuthStore(s => s.loading)
     const authSigningIn = useMarketAuthStore(s => s.signingIn)
-    const pendingOAuthUrl = useMarketAuthStore(s => s.pendingOAuthUrl)
-    const startDiscordSignIn = useMarketAuthStore(s => s.startDiscordSignIn)
-    const openOAuthBrowser = useMarketAuthStore(s => s.openOAuthBrowser)
+    const signInWithDiscord = useMarketAuthStore(s => s.signInWithDiscord)
     const cancelSignIn = useMarketAuthStore(s => s.cancelSignIn)
     const signOut = useMarketAuthStore(s => s.signOut)
-
-    const oauthContainerRef = useRef<HTMLDivElement>(null)
 
     const [presets, setPresets] = useState<MarketPreset[]>([])
     const [loading, setLoading] = useState(false)
@@ -41,6 +39,8 @@ export default function Marketplace() {
     const [activeSearch, setActiveSearch] = useState('')
     const [viewMode, setViewMode] = useState<ViewMode>('browse')
     const [contentFilter, setContentFilter] = useState<ContentFilter>('all')
+    const [deleteTarget, setDeleteTarget] = useState<MarketPreset | null>(null)
+    const [showUsernameDialog, setShowUsernameDialog] = useState(false)
 
     // Load presets (first page or subsequent page)
     const loadPresets = async (append: boolean = false) => {
@@ -103,13 +103,17 @@ export default function Marketplace() {
         loadPresets(false)
     }, [sortMode, viewMode, activeSearch, contentFilter, user?.id])
 
-    const handleDelete = async (preset: MarketPreset, e: React.MouseEvent) => {
+    const requestDelete = (preset: MarketPreset, e: React.MouseEvent) => {
         e.stopPropagation()
-        if (!confirm(t('marketplace.confirmDelete', '이 프리셋을 정말 삭제하시겠습니까? 되돌릴 수 없습니다.'))) return
+        setDeleteTarget(preset)
+    }
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return
         try {
-            const { error } = await supabase.from('presets').delete().eq('id', preset.id)
+            const { error } = await supabase.from('presets').delete().eq('id', deleteTarget.id)
             if (error) throw error
-            setPresets(prev => prev.filter(p => p.id !== preset.id))
+            setPresets(prev => prev.filter(p => p.id !== deleteTarget.id))
             toast({ title: t('marketplace.deleted', '프리셋이 삭제되었습니다'), variant: 'success' })
         } catch (e: any) {
             toast({ title: t('marketplace.deleteFailed', '삭제 실패'), description: readableError(e), variant: 'destructive' })
@@ -123,35 +127,13 @@ export default function Marketplace() {
 
     const handleSignIn = async () => {
         try {
-            await startDiscordSignIn()
-            // The effect below will open the browser once container is mounted
+            await signInWithDiscord()
+            toast({ title: t('marketplace.signedIn', '로그인 완료'), variant: 'success' })
         } catch (e: any) {
+            if (e.message === 'OAuth cancelled') return
             toast({ title: t('marketplace.signInFailed', '로그인 실패'), description: e.message, variant: 'destructive' })
         }
     }
-
-    // Open OAuth browser at container position once modal is mounted
-    useEffect(() => {
-        if (!authSigningIn || !pendingOAuthUrl || !oauthContainerRef.current) return
-
-        const rect = oauthContainerRef.current.getBoundingClientRect()
-        openOAuthBrowser(pendingOAuthUrl, {
-            x: rect.left,
-            y: rect.top,
-            width: rect.width,
-            height: rect.height,
-        })
-            .then(() => {
-                toast({ title: t('marketplace.signedIn', '로그인 완료'), variant: 'success' })
-            })
-            .catch((e: any) => {
-                if (e.message === 'OAuth cancelled') return
-                toast({ title: t('marketplace.signInFailed', '로그인 실패'), description: e.message, variant: 'destructive' })
-            })
-    }, [authSigningIn, pendingOAuthUrl])
-
-    // Note: Intentionally NOT resizing on window resize - WebView2 on Windows
-    // may trigger a reload, interrupting the OAuth flow.
 
     const handleSignOut = async () => {
         await signOut()
@@ -160,23 +142,21 @@ export default function Marketplace() {
 
     return (
         <>
-        {/* OAuth Browser Overlay */}
+        {/* OAuth Waiting Overlay — browser is open externally */}
         {authSigningIn && (
             <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                <div className="bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col" style={{ width: 'min(600px, 90vw)', height: 'min(800px, 90vh)' }}>
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0">
-                        <span className="text-sm font-medium">{t('marketplace.signingInDiscord', 'Discord 로그인')}</span>
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => cancelSignIn()}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
+                <div className="bg-card border border-border rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 max-w-sm text-center">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <div>
+                        <h3 className="font-semibold text-base mb-1">{t('marketplace.signingInDiscord', 'Discord 로그인')}</h3>
+                        <p className="text-sm text-muted-foreground">
+                            {t('marketplace.waitingBrowser', '브라우저에서 Discord 로그인을 완료해주세요.')}
+                        </p>
                     </div>
-                    {/* This div is where the native webview is positioned */}
-                    <div ref={oauthContainerRef} className="flex-1" />
+                    <Button variant="outline" size="sm" onClick={() => cancelSignIn()} className="gap-2">
+                        <X className="h-4 w-4" />
+                        {t('common.cancel', '취소')}
+                    </Button>
                 </div>
             </div>
         )}
@@ -192,14 +172,20 @@ export default function Marketplace() {
                     <div className="h-9 w-32 bg-muted/30 rounded-lg animate-pulse" />
                 ) : user && profile ? (
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full">
+                        <button
+                            type="button"
+                            onClick={() => setShowUsernameDialog(true)}
+                            title={t('marketplace.changeUsername', '닉네임 변경')}
+                            className="group flex items-center gap-2 px-3 py-1.5 bg-muted/30 hover:bg-muted/50 rounded-full transition-colors"
+                        >
                             {profile.avatar_url ? (
                                 <img src={profile.avatar_url} alt={profile.username} className="h-6 w-6 rounded-full" />
                             ) : (
                                 <User className="h-5 w-5" />
                             )}
                             <span className="text-sm font-medium">{profile.username}</span>
-                        </div>
+                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
                         <Button variant="ghost" size="icon" onClick={handleSignOut} title={t('marketplace.signOut', '로그아웃')}>
                             <LogOut className="h-4 w-4" />
                         </Button>
@@ -306,7 +292,7 @@ export default function Marketplace() {
                                     preset={preset}
                                     onClick={() => navigate(`/marketplace/${preset.id}`)}
                                     showDelete={viewMode === 'myUploads'}
-                                    onDelete={(e) => handleDelete(preset, e)}
+                                    onDelete={(e) => requestDelete(preset, e)}
                                 />
                             ))}
                         </div>
@@ -328,6 +314,20 @@ export default function Marketplace() {
                 )}
             </div>
         </div>
+        <ConfirmDialog
+            open={!!deleteTarget}
+            onOpenChange={(o) => !o && setDeleteTarget(null)}
+            title={t('marketplace.confirmDeleteTitle', '프리셋 삭제')}
+            description={t('marketplace.confirmDelete', '이 프리셋을 정말 삭제하시겠습니까? 되돌릴 수 없습니다.')}
+            confirmText={t('common.delete', '삭제')}
+            cancelText={t('common.cancel', '취소')}
+            variant="destructive"
+            onConfirm={confirmDelete}
+        />
+        <ChangeUsernameDialog
+            open={showUsernameDialog}
+            onOpenChange={setShowUsernameDialog}
+        />
         </>
     )
 }

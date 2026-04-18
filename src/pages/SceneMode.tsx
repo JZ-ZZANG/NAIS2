@@ -85,6 +85,7 @@ import { writeFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
 import { ExportDialog } from '@/components/scene/ExportDialog'
 import { UploadPresetDialog } from '@/components/marketplace/UploadPresetDialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
     Dialog,
     DialogContent,
@@ -406,6 +407,7 @@ export default function SceneMode() {
     const [showExportDialog, setShowExportDialog] = useState(false)
     const [exportScenesFilter, setExportScenesFilter] = useState<'all' | 'selected'>('all')
     const [showUploadDialog, setShowUploadDialog] = useState(false)
+    const [showDeletePresetDialog, setShowDeletePresetDialog] = useState(false)
 
     // Scenes to export based on filter
     const scenesToExport = exportScenesFilter === 'selected'
@@ -757,7 +759,7 @@ export default function SceneMode() {
                                 </Tip>
                             )}
                             <Tip content={t('scene.deletePreset', '프리셋 삭제')}>
-                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (confirm(t('scene.confirmDeletePreset', '이 프리셋을 삭제하시겠습니까?'))) deletePreset(activePreset.id) }} disabled={isGenerating}>
+                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeletePresetDialog(true)} disabled={isGenerating}>
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </Tip>
@@ -856,6 +858,17 @@ export default function SceneMode() {
                 open={showUploadDialog}
                 onOpenChange={setShowUploadDialog}
                 preset={activePreset ?? null}
+            />
+
+            <ConfirmDialog
+                open={showDeletePresetDialog}
+                onOpenChange={setShowDeletePresetDialog}
+                title={t('scene.deletePreset', '프리셋 삭제')}
+                description={t('scene.confirmDeletePreset', '이 프리셋을 삭제하시겠습니까?')}
+                confirmText={t('common.delete', '삭제')}
+                cancelText={t('common.cancel', '취소')}
+                variant="destructive"
+                onConfirm={() => { if (activePreset) deletePreset(activePreset.id) }}
             />
         </div >
     )

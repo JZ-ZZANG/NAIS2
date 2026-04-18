@@ -429,7 +429,7 @@ async fn remove_background(image_base64: String) -> RemoveBackgroundResult {
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Url};
 
 // Store for tracking embedded webviews
 struct EmbeddedWebviews {
@@ -493,86 +493,6 @@ async fn close_embedded_browser(app: AppHandle) -> Result<(), String> {
 
     if let Ok(mut store) = EMBEDDED_WEBVIEWS.lock() {
         store.webviews.remove("embedded_browser");
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn open_oauth_browser(
-    app: AppHandle,
-    url: String,
-    callback_pattern: String,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    // Close any existing OAuth browser
-    let _ = close_oauth_browser(app.clone()).await;
-
-    let parsed_url = Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
-    let window = app.get_window("main").ok_or("Main window not found")?;
-    let app_clone = app.clone();
-    let pattern = callback_pattern.clone();
-
-    let webview_builder = tauri::webview::WebviewBuilder::new(
-        "oauth_browser",
-        tauri::WebviewUrl::External(parsed_url),
-    )
-    .on_navigation(move |nav_url| {
-        let nav_str = nav_url.to_string();
-        if nav_str.contains(&pattern) {
-            let _ = app_clone.emit("oauth-callback", nav_str);
-            return false;
-        }
-        true
-    });
-
-    window
-        .add_child(
-            webview_builder,
-            LogicalPosition::new(x, y),
-            LogicalSize::new(width, height),
-        )
-        .map_err(|e| format!("Failed to create OAuth webview: {}", e))?;
-
-    if let Ok(mut store) = EMBEDDED_WEBVIEWS.lock() {
-        store.webviews.insert("oauth_browser".to_string(), true);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn resize_oauth_browser(
-    app: AppHandle,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    if let Some(webview) = app.get_webview("oauth_browser") {
-        webview
-            .set_position(LogicalPosition::new(x, y))
-            .map_err(|e| format!("Position failed: {}", e))?;
-        webview
-            .set_size(LogicalSize::new(width, height))
-            .map_err(|e| format!("Size failed: {}", e))?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn close_oauth_browser(app: AppHandle) -> Result<(), String> {
-    if let Some(webview) = app.get_webview("oauth_browser") {
-        webview
-            .close()
-            .map_err(|e| format!("Failed to close OAuth browser: {}", e))?;
-    }
-
-    if let Ok(mut store) = EMBEDDED_WEBVIEWS.lock() {
-        store.webviews.remove("oauth_browser");
     }
 
     Ok(())
@@ -643,7 +563,20 @@ async fn zoom_embedded_browser(app: AppHandle, zoom_level: f64) -> Result<(), St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -652,6 +585,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             verify_token,
             get_anlas_balance,
@@ -666,9 +600,6 @@ pub fn run() {
             hide_embedded_browser,
             is_browser_open,
             zoom_embedded_browser,
-            open_oauth_browser,
-            close_oauth_browser,
-            resize_oauth_browser,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -677,6 +608,12 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+
+            #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = app.deep_link().register_all();
             }
 
             #[cfg(target_os = "macos")]

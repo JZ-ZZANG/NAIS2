@@ -22,6 +22,7 @@
     "common": {
         "save": "저장",
         "saved": "저장되었습니다",
+        "saving": "저장 중...",
         "cancel": "취소",
         "delete": "삭제",
         "edit": "편집",
@@ -460,7 +461,8 @@
             "appearance": "외관",
             "api": "API",
             "storage": "저장",
-            "shortcuts": "단축키"
+            "shortcuts": "단축키",
+            "discord": "디스코드 커뮤니티"
         },
         "api": {
             "title": "API 설정",
@@ -621,9 +623,19 @@
         "signInDiscord": "Discord로 로그인",
         "signingIn": "로그인 중...",
         "signingInDiscord": "Discord 로그인",
+        "waitingBrowser": "브라우저에서 Discord 로그인을 완료해주세요.",
         "signedIn": "로그인 완료",
         "signedOut": "로그아웃되었습니다",
         "signOut": "로그아웃",
+        "changeUsername": "닉네임 변경",
+        "changeUsernameDesc": "2자 이상 20자 이하로 입력해주세요. 24시간에 한 번만 변경할 수 있습니다.",
+        "username": "닉네임",
+        "usernamePlaceholder": "닉네임 입력",
+        "usernameUpdated": "닉네임이 변경되었습니다",
+        "usernameUpdateFailed": "닉네임 변경 실패",
+        "usernameTaken": "이미 사용 중인 닉네임입니다",
+        "usernameCooldown": "닉네임은 24시간에 한 번만 변경할 수 있습니다",
+        "usernameCooldownRemaining": "{{time}} 후에 다시 변경할 수 있습니다.",
         "signInFailed": "로그인 실패",
         "loginRequired": "로그인이 필요합니다",
         "shareToMarket": "마켓에 공유",

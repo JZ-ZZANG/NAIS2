@@ -100,6 +100,7 @@
     },
     "opener:default",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "deep-link:default"
   ]
 }

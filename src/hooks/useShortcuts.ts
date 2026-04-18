@@ -58,8 +58,14 @@ export function useShortcuts() {
                 if (matchesBinding(e, binding)) {
                     // 네비게이션은 입력 필드에서도 작동
                     if (action.startsWith('navigate:')) {
+                        // 다이얼로그가 열려 있으면 Tab/Shift+Tab은 네이티브 포커스 이동에 양보
+                        if ((action === 'navigate:next' || action === 'navigate:prev') &&
+                            document.querySelector('[role="dialog"][data-state="open"]')) {
+                            return
+                        }
+
                         e.preventDefault()
-                        
+
                         // 다음/이전 메뉴 이동
                         if (action === 'navigate:next' || action === 'navigate:prev') {
                             const currentPath = location.pathname.startsWith('/scenes/') ? '/scenes' : location.pathname
