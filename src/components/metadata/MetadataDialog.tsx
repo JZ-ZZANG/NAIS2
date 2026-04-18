@@ -160,12 +160,29 @@ export function MetadataDialog({ open, onOpenChange, initialImage }: MetadataDia
 
         // Apply selected metadata to generation store
         if (loadOptions.prompts) {
-            if (metadata.prompt) genStore.setBasePrompt(metadata.prompt)
-            // V4 negative prompt has priority over legacy uc
-            if (metadata.v4_negative_prompt?.caption?.base_caption) {
-                genStore.setNegativePrompt(metadata.v4_negative_prompt.caption.base_caption)
-            } else if (metadata.negativePrompt) {
-                genStore.setNegativePrompt(metadata.negativePrompt)
+            if (metadata.promptParts) {
+                // NAIS2-generated image: restore each section separately.
+                genStore.setBasePrompt(metadata.promptParts.base)
+                genStore.setAdditionalPrompt(metadata.promptParts.additional)
+                genStore.setDetailPrompt(metadata.promptParts.detail)
+                if (metadata.promptParts.inpainting !== undefined) {
+                    genStore.setInpaintingPrompt(metadata.promptParts.inpainting)
+                }
+                if (metadata.promptParts.negative !== undefined) {
+                    genStore.setNegativePrompt(metadata.promptParts.negative)
+                }
+            } else if (metadata.prompt) {
+                // External image: merged prompt lands in basePrompt (fallback).
+                genStore.setBasePrompt(metadata.prompt)
+            }
+            // V4 negative prompt has priority over legacy uc when not already set
+            // by promptParts above.
+            if (!metadata.promptParts?.negative) {
+                if (metadata.v4_negative_prompt?.caption?.base_caption) {
+                    genStore.setNegativePrompt(metadata.v4_negative_prompt.caption.base_caption)
+                } else if (metadata.negativePrompt) {
+                    genStore.setNegativePrompt(metadata.negativePrompt)
+                }
             }
         }
 
@@ -386,11 +403,11 @@ export function MetadataDialog({ open, onOpenChange, initialImage }: MetadataDia
                                                 <span className="text-muted-foreground">Steps:</span>
                                                 <span className="ml-1 font-medium">{metadata.steps || '-'}</span>
                                             </div>
-                                            <div className="bg-muted/30 rounded-lg p-2">
-                                                <span className="text-muted-foreground">CFG:</span>
+                                            <div className="bg-muted/30 rounded-lg p-2" title="Prompt Guidance (API: scale)">
+                                                <span className="text-muted-foreground">Guidance:</span>
                                                 <span className="ml-1 font-medium">{metadata.cfgScale || '-'}</span>
                                             </div>
-                                            <div className="bg-muted/30 rounded-lg p-2">
+                                            <div className="bg-muted/30 rounded-lg p-2" title="Prompt Guidance Rescale (API: cfg_rescale)">
                                                 <span className="text-muted-foreground">Rescale:</span>
                                                 <span className="ml-1 font-medium">{metadata.cfgRescale ?? '-'}</span>
                                             </div>
@@ -414,7 +431,9 @@ export function MetadataDialog({ open, onOpenChange, initialImage }: MetadataDia
                                             <div className="bg-muted/30 rounded-lg p-2">
                                                 <span className="text-muted-foreground">Quality Tags:</span>
                                                 <span className="ml-1 font-medium">
-                                                    {metadata.qualityToggle ? 'ON' : 'OFF'}
+                                                    {typeof metadata.qualityToggle === 'boolean'
+                                                        ? (metadata.qualityToggle ? 'ON' : 'OFF')
+                                                        : '-'}
                                                 </span>
                                             </div>
                                             <div className="bg-muted/30 rounded-lg p-2">

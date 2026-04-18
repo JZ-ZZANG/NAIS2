@@ -490,6 +490,17 @@ export const useGenerationStore = create<GenerationState>()(
                             // NAI UI options (Quality Tags & UC Preset)
                             qualityToggle: get().qualityToggle,
                             ucPreset: get().ucPreset,
+
+                            // Original prompt parts (pre-merge). Embedded into the image
+                            // as nais2-params so re-importing restores each section instead
+                            // of dumping everything into basePrompt.
+                            promptParts: {
+                                base: basePrompt,
+                                additional: additionalPrompt,
+                                detail: detailPrompt,
+                                negative: negativePrompt,
+                                inpainting: inpaintingPrompt,
+                            },
                         }
 
                         // Reset progress
