@@ -32,10 +32,12 @@ tauri-plugin-opener = "2.5.2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-deep-link = "2"
-
-[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
-tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
 zip = "2.2"
 base64 = "0.22"
+
+# Desktop-only: single-instance plugin is not available on mobile targets,
+# and the "deep-link" feature integrates with our nais2:// callback handler.
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

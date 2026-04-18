@@ -565,7 +565,7 @@ async fn zoom_embedded_browser(app: AppHandle, zoom_level: f64) -> Result<(), St
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             use tauri::Manager;
