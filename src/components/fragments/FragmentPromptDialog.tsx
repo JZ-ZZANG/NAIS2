@@ -488,9 +488,13 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                                         {t('fragment.exportAll', '전체 내보내기 (JSON)')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => setShowUploadDialog(true)} disabled={files.length === 0}>
+                                    <DropdownMenuItem
+                                        onClick={() => setShowUploadDialog(true)}
+                                        disabled={!selectedFile}
+                                        title={!selectedFile ? t('marketplace.selectFileFirst', '공유할 파일을 먼저 선택하세요') : undefined}
+                                    >
                                         <Store className="h-4 w-4 mr-2" />
-                                        {t('marketplace.shareFragments', '마켓에 공유')}
+                                        {t('marketplace.shareFragment', '마켓에 공유')}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -660,6 +664,7 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
             <UploadFragmentDialog
                 open={showUploadDialog}
                 onOpenChange={setShowUploadDialog}
+                fileId={selectedFileId}
             />
         </Dialog>
     )

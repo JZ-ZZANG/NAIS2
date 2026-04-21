@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Store, Heart, Download, LogIn, LogOut, Search, Clock, Flame, User, X, Trash2, Package, Film, Puzzle, Loader2, Pencil } from 'lucide-react'
+import { Store, Heart, Download, LogIn, LogOut, Search, Clock, Flame, User, X, Trash2, Package, Film, Puzzle, Loader2, Pencil, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/use-toast'
 import { supabase, MarketPreset, readableError } from '@/lib/supabase'
 import { useMarketAuthStore } from '@/stores/market-auth-store'
+import { ScenePreset } from '@/stores/scene-store'
+import { FragmentFileMeta } from '@/stores/fragment-store'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ChangeUsernameDialog } from '@/components/marketplace/ChangeUsernameDialog'
+import { UploadPresetDialog } from '@/components/marketplace/UploadPresetDialog'
+import { UploadFragmentDialog } from '@/components/marketplace/UploadFragmentDialog'
+import { SelectScenePresetDialog } from '@/components/marketplace/SelectScenePresetDialog'
+import { SelectFragmentFileDialog } from '@/components/marketplace/SelectFragmentFileDialog'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 import { MarketPresetType } from '@/lib/supabase'
 
@@ -41,6 +53,10 @@ export default function Marketplace() {
     const [contentFilter, setContentFilter] = useState<ContentFilter>('all')
     const [deleteTarget, setDeleteTarget] = useState<MarketPreset | null>(null)
     const [showUsernameDialog, setShowUsernameDialog] = useState(false)
+    const [showSelectPresetDialog, setShowSelectPresetDialog] = useState(false)
+    const [uploadScenePreset, setUploadScenePreset] = useState<ScenePreset | null>(null)
+    const [showSelectFragmentDialog, setShowSelectFragmentDialog] = useState(false)
+    const [uploadFragmentFile, setUploadFragmentFile] = useState<FragmentFileMeta | null>(null)
 
     // Load presets (first page or subsequent page)
     const loadPresets = async (append: boolean = false) => {
@@ -172,6 +188,24 @@ export default function Marketplace() {
                     <div className="h-9 w-32 bg-muted/30 rounded-lg animate-pulse" />
                 ) : user && profile ? (
                     <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="gap-2 rounded-full">
+                                    <Upload className="h-4 w-4" />
+                                    {t('marketplace.upload', '업로드')}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onClick={() => setShowSelectPresetDialog(true)}>
+                                    <Film className="h-4 w-4 mr-2 text-blue-400" />
+                                    {t('marketplace.uploadScenePreset', '씬 프리셋 업로드')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShowSelectFragmentDialog(true)}>
+                                    <Puzzle className="h-4 w-4 mr-2 text-green-400" />
+                                    {t('marketplace.uploadFragment', '조각 프롬프트 업로드')}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <button
                             type="button"
                             onClick={() => setShowUsernameDialog(true)}
@@ -327,6 +361,28 @@ export default function Marketplace() {
         <ChangeUsernameDialog
             open={showUsernameDialog}
             onOpenChange={setShowUsernameDialog}
+        />
+        <SelectScenePresetDialog
+            open={showSelectPresetDialog}
+            onOpenChange={setShowSelectPresetDialog}
+            onSelect={(preset) => setUploadScenePreset(preset)}
+        />
+        <UploadPresetDialog
+            open={!!uploadScenePreset}
+            onOpenChange={(o) => { if (!o) setUploadScenePreset(null) }}
+            preset={uploadScenePreset}
+            onUploaded={() => loadPresets(false)}
+        />
+        <SelectFragmentFileDialog
+            open={showSelectFragmentDialog}
+            onOpenChange={setShowSelectFragmentDialog}
+            onSelect={(file) => setUploadFragmentFile(file)}
+        />
+        <UploadFragmentDialog
+            open={!!uploadFragmentFile}
+            onOpenChange={(o) => { if (!o) setUploadFragmentFile(null) }}
+            fileId={uploadFragmentFile?.id ?? null}
+            onUploaded={() => loadPresets(false)}
         />
         </>
     )

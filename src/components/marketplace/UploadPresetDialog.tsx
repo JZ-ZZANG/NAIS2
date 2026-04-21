@@ -14,9 +14,10 @@ interface UploadPresetDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     preset: ScenePreset | null
+    onUploaded?: () => void
 }
 
-export function UploadPresetDialog({ open, onOpenChange, preset }: UploadPresetDialogProps) {
+export function UploadPresetDialog({ open, onOpenChange, preset, onUploaded }: UploadPresetDialogProps) {
     const { t } = useTranslation()
     const { user } = useMarketAuthStore()
     const [title, setTitle] = useState('')
@@ -79,6 +80,7 @@ export function UploadPresetDialog({ open, onOpenChange, preset }: UploadPresetD
 
             toast({ title: t('marketplace.uploadSuccess', '업로드 완료'), variant: 'success' })
             handleOpenChange(false)
+            onUploaded?.()
         } catch (e: any) {
             console.error('Upload failed:', e)
             toast({ title: t('marketplace.uploadFailed', '업로드 실패'), description: readableError(e), variant: 'destructive' })

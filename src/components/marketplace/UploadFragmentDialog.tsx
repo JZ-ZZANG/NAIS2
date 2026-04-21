@@ -13,13 +13,17 @@ import { Upload, X, Plus } from 'lucide-react'
 interface UploadFragmentDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
+    fileId: string | null
+    onUploaded?: () => void
 }
 
-export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialogProps) {
+export function UploadFragmentDialog({ open, onOpenChange, fileId, onUploaded }: UploadFragmentDialogProps) {
     const { t } = useTranslation()
     const { user } = useMarketAuthStore()
     const files = useFragmentStore(s => s.files)
-    const exportAll = useFragmentStore(s => s.exportAll)
+    const loadFileContent = useFragmentStore(s => s.loadFileContent)
+
+    const selectedFile = fileId ? files.find(f => f.id === fileId) ?? null : null
 
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
@@ -33,6 +37,8 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
             setDescription('')
             setTags([])
             setTagInput('')
+        } else if (selectedFile) {
+            setTitle(selectedFile.name)
         }
         onOpenChange(next)
     }
@@ -47,20 +53,19 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
     const removeTag = (tag: string) => setTags(tags.filter(t => t !== tag))
 
     const handleUpload = async () => {
-        if (!user) return
+        if (!user || !selectedFile) return
         if (!title.trim()) {
             toast({ title: t('marketplace.titleRequired', '제목을 입력해주세요'), variant: 'destructive' })
-            return
-        }
-        if (files.length === 0) {
-            toast({ title: t('marketplace.noFragments', '조각 프롬프트가 없습니다'), variant: 'destructive' })
             return
         }
 
         setUploading(true)
         try {
-            // Export all fragments as JSON (includes metadata + content)
-            const exportData = await exportAll()
+            const content = await loadFileContent(selectedFile.id)
+            const exportData = {
+                meta: [selectedFile],
+                contents: { [selectedFile.id]: content },
+            }
 
             const { error } = await supabase.from('presets').insert({
                 user_id: user.id,
@@ -68,7 +73,7 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
                 description: description.trim() || null,
                 type: 'fragment',
                 scene_data: exportData,
-                scene_count: files.length,
+                scene_count: 1,
                 tags: tags,
             })
 
@@ -76,6 +81,7 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
 
             toast({ title: t('marketplace.uploadSuccess', '업로드 완료'), variant: 'success' })
             handleOpenChange(false)
+            onUploaded?.()
         } catch (e: any) {
             console.error('Fragment upload failed:', e)
             toast({ title: t('marketplace.uploadFailed', '업로드 실패'), description: readableError(e), variant: 'destructive' })
@@ -90,7 +96,7 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Upload className="h-5 w-5" />
-                        {t('marketplace.shareFragments', '조각 프롬프트 공유')}
+                        {t('marketplace.shareFragment', '조각 프롬프트 공유')}
                     </DialogTitle>
                     <DialogDescription>
                         {t('marketplace.shareDesc', '업로드한 프리셋은 공개되며 누구나 다운로드할 수 있습니다.')}
@@ -98,9 +104,16 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
-                    <div className="text-sm text-muted-foreground">
-                        {t('marketplace.fragmentCount', '조각 파일 수')}: <span className="font-medium text-foreground">{files.length}</span>
-                    </div>
+                    {selectedFile && (
+                        <div className="text-sm text-muted-foreground">
+                            {t('marketplace.selectedFragment', '선택된 조각')}:{' '}
+                            <span className="font-medium text-foreground">
+                                {selectedFile.folder ? `${selectedFile.folder}/` : ''}{selectedFile.name}
+                            </span>
+                            {' · '}
+                            <span>{t('marketplace.lineCount', '{{count}}줄', { count: selectedFile.lineCount })}</span>
+                        </div>
+                    )}
 
                     <div>
                         <Label className="text-xs">{t('marketplace.presetTitle', '제목')} *</Label>
@@ -157,7 +170,10 @@ export function UploadFragmentDialog({ open, onOpenChange }: UploadFragmentDialo
                     <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={uploading}>
                         {t('common.cancel', '취소')}
                     </Button>
-                    <Button onClick={handleUpload} disabled={uploading || !title.trim() || !user || files.length === 0}>
+                    <Button
+                        onClick={handleUpload}
+                        disabled={uploading || !title.trim() || !user || !selectedFile}
+                    >
                         {uploading ? t('marketplace.uploading', '업로드 중...') : t('marketplace.upload', '업로드')}
                     </Button>
                 </DialogFooter>
