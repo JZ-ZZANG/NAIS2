@@ -2487,7 +2487,7 @@ dependencies = [
 
 [[package]]
 name = "nais2-custom"
-version = "2.7.2-custom.1"
+version = "2.7.2-1"
 dependencies = [
  "base64 0.22.1",
  "log",
