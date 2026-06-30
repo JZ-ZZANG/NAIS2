@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "NAIS2",
-  "version": "2.7.2",
-  "identifier": "com.sunakgo.nais2",
+  "productName": "NAIS2 Custom",
+  "version": "2.7.2-custom.1",
+  "identifier": "com.jz.nais2custom",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:9090",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "NAIS2 - NovelAI Image Studio",
+        "title": "NAIS2 Custom - NovelAI Image Studio",
         "width": 1600,
         "height": 900,
         "resizable": true,
@@ -36,14 +36,14 @@
     },
     "updater": {
       "endpoints": [
-        "https://github.com/sunanakgo/NAIS2/releases/latest/download/latest.json"
+        "https://github.com/JZ-ZZANG/NAIS2/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0NDgxN0Q3MTUyMjQxOTYKUldTV1FTSVYxeGRJeEZpdWFOMlU0K2MvK3QvZHJnbVBtYUY5R1hXVHFsUHRpWFRmU1ZsZW53b0oK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVCRTc1OTZGRDY4QjhGOTMKUldTVGo0dldiMW5uVzUvUjB1dEg5Nkx0VHQzL1JzSHk1eGg3bzFxenc0ajd2eWo2bU9pWDcrYTYK"
     },
     "deep-link": {
       "mobile": [],
       "desktop": {
-        "schemes": ["nais2"]
+        "schemes": ["nais2-custom"]
       }
     }
   },

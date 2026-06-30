@@ -238,7 +238,7 @@ export default function SceneDetail() {
         }
 
         // Start a new generation session to properly track and allow cancellation
-        useSceneStore.getState().startNewGenerationSession()
+        useSceneStore.getState().startNewGenerationSession('detail')
     }
 
     const handleOpenFolder = async () => {

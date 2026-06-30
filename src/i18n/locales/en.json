@@ -120,6 +120,36 @@
         "gridColumnsDesc": "Change grid column count",
         "deletePreset": "Delete Preset"
     },
+    "sceneSequence": {
+        "shortTitle": "Queue Repeat",
+        "toggleTooltip": "Character queue repeat",
+        "settings": "Character/reference queue repeat settings",
+        "title": "Character / Reference Queue Repeat",
+        "description": "Repeats the full queue while changing character prompts / reference images. When this mode is enabled, character prompts/reference images from the main settings are not applied.",
+        "itemCount": "{{count}} items",
+        "addItem": "Add Item",
+        "clearAll": "Clear All",
+        "empty": "Add a queue repeat item to start.",
+        "itemNamePlaceholder": "Queue repeat item name",
+        "characterPrompts": "Character Prompts",
+        "characterReferences": "Character References",
+        "vibeReferences": "Vibe References",
+        "noPromptPresets": "No character prompts.",
+        "noCharacterRefs": "No character references.",
+        "noVibeRefs": "No vibe references.",
+        "refBadge": "Ref",
+        "vibeBadge": "Vibe"
+    },
+    "sceneCharacterAddition": {
+        "shortTitle": "Scene Characters",
+        "toggleTooltip": "Add scene characters",
+        "title": "Scene Character Additions",
+        "description": "Select character prompts and reference images to add only when generating this scene.",
+        "summary": "Characters {{characters}} · Refs {{refs}} · Vibes {{vibes}}",
+        "clear": "Clear",
+        "emptyInline": "No scene characters",
+        "characterCount": "Char"
+    },
     "preset": {
         "default": "Default",
         "add": "New Preset",

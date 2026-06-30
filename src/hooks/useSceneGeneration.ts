@@ -29,7 +29,8 @@ export function useSceneGeneration() {
         isGenerating,
         setIsGenerating,
         activePresetId,
-        decrementFirstQueuedScene,
+        getNextCharacterSequenceScene,
+        getHasMoreSceneGeneration,
         addImageToScene,
         setStreamingData,
         initGenerationProgress,
@@ -96,7 +97,9 @@ export function useSceneGeneration() {
                 return
             }
 
-            const scene = decrementFirstQueuedScene(activePresetId)
+            const nextGeneration = getNextCharacterSequenceScene(activePresetId)
+            const scene = nextGeneration?.scene
+            const sequenceEntry = nextGeneration?.entry ?? null
 
             if (!scene) {
                 setIsGenerating(false)
@@ -145,9 +148,46 @@ export function useSceneGeneration() {
                 // Ensure base64 data is loaded from files before generation
                 await useCharacterStore.getState().ensureImagesLoaded()
                 const latestCharStore = useCharacterStore.getState()
-                const characterImages = latestCharStore.characterImages.filter(img => img.enabled !== false && img.base64)
-                const vibeImages = latestCharStore.vibeImages.filter(img => img.enabled !== false && img.base64)
-                const { characters: characterPrompts } = useCharacterPromptStore.getState()
+                const latestPromptStore = useCharacterPromptStore.getState()
+                const latestSceneStore = useSceneStore.getState()
+                const sequenceMode = !!sequenceEntry
+                const sceneAddition = latestSceneStore.sceneCharacterAdditionsEnabled
+                    ? latestSceneStore.sceneCharacterAdditions[activePresetId]?.[scene.id]
+                    : null
+                const uniqueIds = (ids: string[]) => Array.from(new Set(ids))
+                const characterReferenceIds = sequenceMode
+                    ? sequenceEntry.characterReferenceIds
+                    : latestCharStore.characterImages.filter(img => img.enabled !== false).map(img => img.id)
+                const vibeReferenceIds = sequenceMode
+                    ? sequenceEntry.vibeReferenceIds
+                    : latestCharStore.vibeImages.filter(img => img.enabled !== false).map(img => img.id)
+                const characterPromptIds = sequenceMode
+                    ? sequenceEntry.characterPromptIds
+                    : latestPromptStore.characters.filter(character => character.enabled).map(character => character.id)
+                const finalCharacterReferenceIds = uniqueIds([
+                    ...characterReferenceIds,
+                    ...(sceneAddition?.characterReferenceIds || []),
+                ])
+                const finalVibeReferenceIds = uniqueIds([
+                    ...vibeReferenceIds,
+                    ...(sceneAddition?.vibeReferenceIds || []),
+                ])
+                const finalCharacterPromptIds = uniqueIds([
+                    ...characterPromptIds,
+                    ...(sceneAddition?.characterPromptIds || []),
+                ])
+                const characterImages = latestCharStore.characterImages.filter(img => finalCharacterReferenceIds.includes(img.id) && img.base64)
+                const vibeImages = latestCharStore.vibeImages.filter(img => finalVibeReferenceIds.includes(img.id) && img.base64)
+                const characterPrompts = finalCharacterPromptIds.length > 0
+                    ? latestPromptStore.characters
+                        .filter(character => finalCharacterPromptIds.includes(character.id))
+                        .map(character => ({
+                            prompt: character.prompt,
+                            negative: character.negative,
+                            enabled: true,
+                            position: character.position,
+                        }))
+                    : []
 
                 // Apply fragment/wildcard substitution to character prompts (async)
                 const processedCharacterPrompts = await Promise.all(
@@ -381,7 +421,7 @@ export function useSceneGeneration() {
                 const sessionStillValid = sessionId === sceneState.generationSessionId
                 const hasMoreScenes = sessionStillValid && 
                     sceneState.isGenerating &&
-                    sceneState.getQueuedScenes(activePresetId).length > 0
+                    sceneState.getHasMoreSceneGeneration(activePresetId)
 
                 // Apply generation delay only if there are more scenes
                 if (hasMoreScenes) {
@@ -435,7 +475,7 @@ export function useSceneGeneration() {
             // Pass current session ID to processQueue
             processQueue(generationSessionId)
         }
-    }, [isGenerating, activePresetId, token, savePath, t, addImageToScene, decrementFirstQueuedScene, setIsGenerating, streamingView, setStreamingData, initGenerationProgress, setGenerationProgress, completedCount, totalQueuedCount, generationSessionId])
+    }, [isGenerating, activePresetId, token, savePath, t, addImageToScene, getNextCharacterSequenceScene, getHasMoreSceneGeneration, setIsGenerating, streamingView, setStreamingData, initGenerationProgress, setGenerationProgress, completedCount, totalQueuedCount, generationSessionId])
 
     // Reset processing when generation stops
     useEffect(() => {

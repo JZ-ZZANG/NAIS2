@@ -94,8 +94,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'NAIS2 ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
+          releaseName: 'NAIS2 Custom ${{ github.ref_name }}'
+          releaseBody: 'See the assets to download and install this custom version.'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

@@ -119,6 +119,36 @@
         "gridColumnsDesc": "グリッド列数変更",
         "deletePreset": "プリセット削除"
     },
+    "sceneSequence": {
+        "shortTitle": "キュー反復",
+        "toggleTooltip": "キャラクター別キュー反復",
+        "settings": "キャラクター/リファレンスキュー反復設定",
+        "title": "キャラクター / リファレンスキュー反復",
+        "description": "キャラクタープロンプト / リファレンス画像を切り替えながら全体のキューを繰り返します。このモードを有効にすると、メイン設定のキャラクタープロンプト/リファレンス画像は適用されません。",
+        "itemCount": "{{count}}件",
+        "addItem": "項目を追加",
+        "clearAll": "すべてクリア",
+        "empty": "キュー反復項目を追加して開始してください。",
+        "itemNamePlaceholder": "キュー反復項目名",
+        "characterPrompts": "キャラクタープロンプト",
+        "characterReferences": "キャラクターリファレンス",
+        "vibeReferences": "Vibeリファレンス",
+        "noPromptPresets": "キャラクタープロンプトがありません。",
+        "noCharacterRefs": "キャラクターリファレンスがありません。",
+        "noVibeRefs": "Vibeリファレンスがありません。",
+        "refBadge": "参照",
+        "vibeBadge": "Vibe"
+    },
+    "sceneCharacterAddition": {
+        "shortTitle": "シーン別キャラ",
+        "toggleTooltip": "シーン別キャラクター追加",
+        "title": "シーン別キャラクター追加",
+        "description": "このシーンを生成するときだけ追加で適用するキャラクタープロンプトとリファレンス画像を選択します。",
+        "summary": "キャラ {{characters}} · 参照 {{refs}} · Vibe {{vibes}}",
+        "clear": "クリア",
+        "emptyInline": "シーン別キャラなし",
+        "characterCount": "キャラ"
+    },
     "preset": {
         "default": "デフォルト",
         "add": "新規プリセット",

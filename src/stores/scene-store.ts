@@ -30,6 +30,28 @@ export interface ScenePreset {
     createdAt: number
 }
 
+export interface SceneCharacterSequenceEntry {
+    id: string
+    name: string
+    characterPromptIds: string[]
+    characterReferenceIds: string[]
+    vibeReferenceIds: string[]
+    enabled: boolean
+}
+
+export interface SceneCharacterSequenceQueueItem {
+    sceneId: string
+    entryId: string
+}
+
+export interface SceneCharacterAddition {
+    characterPromptIds: string[]
+    characterReferenceIds: string[]
+    vibeReferenceIds: string[]
+}
+
+type SceneGenerationSource = 'queue' | 'detail'
+
 interface SceneState {
     presets: ScenePreset[]
     activePresetId: string | null
@@ -73,6 +95,29 @@ interface SceneState {
 
     // Actions - Generation
     decrementFirstQueuedScene: (presetId: string) => SceneCard | null
+    getNextCharacterSequenceScene: (presetId: string) => { scene: SceneCard; entry: SceneCharacterSequenceEntry | null } | null
+    getHasMoreSceneGeneration: (presetId: string) => boolean
+
+    // Character/Reference Sequence
+    characterSequenceEnabled: boolean
+    characterSequenceEntries: SceneCharacterSequenceEntry[]
+    characterSequenceQueue: SceneCharacterSequenceQueueItem[]
+    activeCharacterSequenceEntryId: string | null
+    setCharacterSequenceEnabled: (enabled: boolean) => void
+    addCharacterSequenceEntry: (entry?: Partial<SceneCharacterSequenceEntry>) => void
+    updateCharacterSequenceEntry: (id: string, updates: Partial<SceneCharacterSequenceEntry>) => void
+    deleteCharacterSequenceEntry: (id: string) => void
+    clearCharacterSequenceEntries: () => void
+    reorderCharacterSequenceEntries: (oldIndex: number, newIndex: number) => void
+    getActiveCharacterSequenceEntry: () => SceneCharacterSequenceEntry | null
+
+    // Scene-specific Character/Reference Additions
+    sceneCharacterAdditionsEnabled: boolean
+    sceneCharacterAdditions: Record<string, Record<string, SceneCharacterAddition>>
+    setSceneCharacterAdditionsEnabled: (enabled: boolean) => void
+    getSceneCharacterAddition: (presetId: string, sceneId: string) => SceneCharacterAddition | null
+    updateSceneCharacterAddition: (presetId: string, sceneId: string, addition: SceneCharacterAddition) => void
+    clearSceneCharacterAddition: (presetId: string, sceneId: string) => void
 
     // Generation Status
     isGenerating: boolean
@@ -80,7 +125,8 @@ interface SceneState {
     setIsGenerating: (isGenerating: boolean) => void
     cancelSceneGeneration: () => void  // Request cancel (keeps button locked until API completes)
     generationSessionId: number  // Incremented on each new generation session to invalidate old ones
-    startNewGenerationSession: () => number  // Returns new session ID
+    generationSource: SceneGenerationSource
+    startNewGenerationSession: (source?: SceneGenerationSource) => number  // Returns new session ID
 
     // Streaming State
     streamingSceneId: string | null
@@ -633,12 +679,158 @@ export const useSceneStore = create<SceneState>()(
                 return queuedScene
             },
 
+            getNextCharacterSequenceScene: (presetId) => {
+                const state = get()
+                const preset = state.presets.find(p => p.id === presetId)
+                if (!preset) return null
+
+                const enabledEntries = state.characterSequenceEntries.filter(e => e.enabled)
+                if (state.generationSource === 'detail' || !state.characterSequenceEnabled || enabledEntries.length === 0) {
+                    const scene = state.decrementFirstQueuedScene(presetId)
+                    set({ activeCharacterSequenceEntryId: null })
+                    return scene ? { scene, entry: null } : null
+                }
+
+                let queue = state.characterSequenceQueue
+                if (queue.length === 0) {
+                    const queuedScenes = preset.scenes.filter(s => s.queueCount > 0)
+                    if (queuedScenes.length === 0) {
+                        set({ activeCharacterSequenceEntryId: null })
+                        return null
+                    }
+
+                    queue = enabledEntries.flatMap(entry =>
+                        queuedScenes.flatMap(scene =>
+                            Array.from({ length: scene.queueCount }, () => ({
+                                sceneId: scene.id,
+                                entryId: entry.id,
+                            }))
+                        )
+                    )
+
+                    set(state => ({
+                        characterSequenceQueue: queue,
+                        presets: state.presets.map(p =>
+                            p.id === presetId
+                                ? { ...p, scenes: p.scenes.map(s => ({ ...s, queueCount: 0 })) }
+                                : p
+                        ),
+                    }))
+                }
+
+                const [next, ...rest] = queue
+                if (!next) {
+                    set({ activeCharacterSequenceEntryId: null })
+                    return null
+                }
+
+                const scene = preset.scenes.find(s => s.id === next.sceneId)
+                const entry = enabledEntries.find(e => e.id === next.entryId) || null
+                set({
+                    characterSequenceQueue: rest,
+                    activeCharacterSequenceEntryId: entry?.id ?? null,
+                })
+
+                return scene ? { scene, entry } : get().getNextCharacterSequenceScene(presetId)
+            },
+
+            getHasMoreSceneGeneration: (presetId) => {
+                const state = get()
+                if (state.generationSource !== 'detail' && state.characterSequenceEnabled && state.characterSequenceEntries.some(e => e.enabled)) {
+                    return state.characterSequenceQueue.length > 0 || state.getQueuedScenes(presetId).length > 0
+                }
+                return state.getQueuedScenes(presetId).length > 0
+            },
+
+            // Character/Reference Sequence
+            characterSequenceEnabled: false,
+            characterSequenceEntries: [],
+            characterSequenceQueue: [],
+            activeCharacterSequenceEntryId: null,
+            setCharacterSequenceEnabled: (enabled) => set({
+                characterSequenceEnabled: enabled,
+                characterSequenceQueue: [],
+                activeCharacterSequenceEntryId: null,
+            }),
+            addCharacterSequenceEntry: (entry) => set(state => ({
+                characterSequenceEntries: [
+                    ...state.characterSequenceEntries,
+                    {
+                        id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
+                        name: entry?.name || `Queue Repeat ${state.characterSequenceEntries.length + 1}`,
+                        characterPromptIds: entry?.characterPromptIds || [],
+                        characterReferenceIds: entry?.characterReferenceIds || [],
+                        vibeReferenceIds: entry?.vibeReferenceIds || [],
+                        enabled: entry?.enabled ?? true,
+                    },
+                ],
+            })),
+            updateCharacterSequenceEntry: (id, updates) => set(state => ({
+                characterSequenceEntries: state.characterSequenceEntries.map(entry =>
+                    entry.id === id ? { ...entry, ...updates } : entry
+                ),
+                characterSequenceQueue: [],
+            })),
+            deleteCharacterSequenceEntry: (id) => set(state => ({
+                characterSequenceEntries: state.characterSequenceEntries.filter(entry => entry.id !== id),
+                characterSequenceQueue: state.characterSequenceQueue.filter(item => item.entryId !== id),
+                activeCharacterSequenceEntryId: state.activeCharacterSequenceEntryId === id ? null : state.activeCharacterSequenceEntryId,
+            })),
+            clearCharacterSequenceEntries: () => set({
+                characterSequenceEntries: [],
+                characterSequenceQueue: [],
+                activeCharacterSequenceEntryId: null,
+            }),
+            reorderCharacterSequenceEntries: (oldIndex, newIndex) => set(state => {
+                const entries = [...state.characterSequenceEntries]
+                const [removed] = entries.splice(oldIndex, 1)
+                entries.splice(newIndex, 0, removed)
+                return { characterSequenceEntries: entries, characterSequenceQueue: [] }
+            }),
+            getActiveCharacterSequenceEntry: () => {
+                const state = get()
+                if (!state.characterSequenceEnabled || !state.activeCharacterSequenceEntryId) return null
+                return state.characterSequenceEntries.find(e => e.id === state.activeCharacterSequenceEntryId) || null
+            },
+
+            // Scene-specific Character/Reference Additions
+            sceneCharacterAdditionsEnabled: false,
+            sceneCharacterAdditions: {},
+            setSceneCharacterAdditionsEnabled: (enabled) => set({ sceneCharacterAdditionsEnabled: enabled }),
+            getSceneCharacterAddition: (presetId, sceneId) => {
+                const addition = get().sceneCharacterAdditions[presetId]?.[sceneId]
+                if (!addition) return null
+                const hasAny = addition.characterPromptIds.length > 0
+                    || addition.characterReferenceIds.length > 0
+                    || addition.vibeReferenceIds.length > 0
+                return hasAny ? addition : null
+            },
+            updateSceneCharacterAddition: (presetId, sceneId, addition) => set(state => ({
+                sceneCharacterAdditions: {
+                    ...state.sceneCharacterAdditions,
+                    [presetId]: {
+                        ...(state.sceneCharacterAdditions[presetId] || {}),
+                        [sceneId]: addition,
+                    },
+                },
+            })),
+            clearSceneCharacterAddition: (presetId, sceneId) => set(state => {
+                const presetAdditions = { ...(state.sceneCharacterAdditions[presetId] || {}) }
+                delete presetAdditions[sceneId]
+                return {
+                    sceneCharacterAdditions: {
+                        ...state.sceneCharacterAdditions,
+                        [presetId]: presetAdditions,
+                    },
+                }
+            }),
+
             isGenerating: false,
             isCancelling: false,
             setIsGenerating: (isGenerating) => {
                 // When stopping generation, increment session ID to invalidate any in-progress operations
                 if (!isGenerating) {
-                    set({ isGenerating: false, isCancelling: false, generationSessionId: Date.now() })
+                    set({ isGenerating: false, isCancelling: false, generationSessionId: Date.now(), generationSource: 'queue', characterSequenceQueue: [], activeCharacterSequenceEntryId: null })
                 } else {
                     set({ isGenerating: true, isCancelling: false })
                 }
@@ -646,12 +838,13 @@ export const useSceneStore = create<SceneState>()(
             cancelSceneGeneration: () => {
                 // Request cancel but keep isGenerating=true until API completes
                 // This prevents 429 errors from rapid cancel/restart
-                set({ isCancelling: true, generationSessionId: Date.now() })
+                set({ isCancelling: true, generationSessionId: Date.now(), generationSource: 'queue', characterSequenceQueue: [], activeCharacterSequenceEntryId: null })
             },
             generationSessionId: 0,
-            startNewGenerationSession: () => {
+            generationSource: 'queue',
+            startNewGenerationSession: (source = 'queue') => {
                 const newSessionId = Date.now()
-                set({ generationSessionId: newSessionId, isGenerating: true, isCancelling: false })
+                set({ generationSessionId: newSessionId, generationSource: source, isGenerating: true, isCancelling: false, characterSequenceQueue: [], activeCharacterSequenceEntryId: null })
                 return newSessionId
             },
 
@@ -973,7 +1166,11 @@ export const useSceneStore = create<SceneState>()(
             }),
 
             initGenerationProgress: () => set(state => {
-                const total = state.activePresetId ? state.presets.find(p => p.id === state.activePresetId)?.scenes.reduce((sum, s) => sum + s.queueCount, 0) || 0 : 0
+                const queuedTotal = state.activePresetId ? state.presets.find(p => p.id === state.activePresetId)?.scenes.reduce((sum, s) => sum + s.queueCount, 0) || 0 : 0
+                const sequenceMultiplier = state.generationSource !== 'detail' && state.characterSequenceEnabled
+                    ? Math.max(1, state.characterSequenceEntries.filter(e => e.enabled).length)
+                    : 1
+                const total = queuedTotal * sequenceMultiplier
                 return {
                     completedCount: 0,
                     totalQueuedCount: total
@@ -1020,6 +1217,10 @@ export const useSceneStore = create<SceneState>()(
                         })
                     })),
                     activePresetId: state.activePresetId,
+                    characterSequenceEnabled: state.characterSequenceEnabled,
+                    characterSequenceEntries: state.characterSequenceEntries,
+                    sceneCharacterAdditionsEnabled: state.sceneCharacterAdditionsEnabled,
+                    sceneCharacterAdditions: state.sceneCharacterAdditions,
                     gridColumns: state.gridColumns,
                     thumbnailLayout: state.thumbnailLayout,
                 }
